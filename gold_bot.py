@@ -6,17 +6,16 @@ import pandas as pd
 # --- Config ---
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 TWELVE_DATA_KEY = os.environ.get("TWELVE_DATA_KEY")
-CHAT_ID = "5873027607"
+CHAT_ID = os.environ.get("CHAT_ID", "-1003576401725")
 SYMBOL = "XAU/USD"
 INTERVAL = "1h"
-CHECK_INTERVAL = 300  # Check every 5 minutes
+CHECK_INTERVAL = 300
 RETEST_TOLERANCE = 8.0
 MIN_LEVEL_TOUCHES = 3
 LOOKBACK = 15
 FIXED_SL = 50
 FIXED_TP = 150
 
-# Track active trade and seen signals
 active_trade = None
 seen_levels = set()
 
@@ -121,12 +120,10 @@ def scan_for_signal(df):
         if touches < MIN_LEVEL_TOUCHES:
             continue
 
-        # Check recent candles for breakout + retest
         for b_idx in range(level_idx + 1, min(level_idx + 80, len(df) - 5)):
             if check_breakout(df, level_price, level_type, b_idx):
                 for r_idx in range(b_idx + 1, min(b_idx + 30, len(df) - 2)):
                     if check_retest(df, level_price, level_type, r_idx):
-                        # Only signal if retest is recent (last 3 candles)
                         if r_idx >= len(df) - 3:
                             entry = df["close"].iloc[-1]
                             direction = "BUY" if level_type == "resistance" else "SELL"
@@ -202,7 +199,12 @@ def check_active_trade(price):
 def run():
     global active_trade
     print("Gold Break & Retest Bot started...")
-    send_telegram("🥇 *Gold Break & Retest Signal Bot is live!*\nMonitoring XAU/USD on 1H chart...")
+    send_telegram(
+        "🥇 *Gold Break & Retest Signal Bot is live!*\n"
+        "📊 Monitoring XAU/USD on 1H chart\n"
+        "📌 Strategy: Break & Retest\n"
+        f"🛑 SL: ${FIXED_SL} | 🎯 TP: ${FIXED_TP} | RR: 1:3"
+    )
 
     while True:
         print("Scanning for signals...")
@@ -216,11 +218,9 @@ def run():
 
         print(f"Current price: ${price}")
 
-        # Check active trade levels
         if active_trade:
             check_active_trade(price)
         else:
-            # Scan for new signal
             signal = scan_for_signal(df)
             if signal:
                 active_trade = signal
@@ -231,7 +231,7 @@ def run():
                 send_telegram(
                     f"{emoji} *GOLD {direction} SIGNAL*\n\n"
                     f"📊 XAU/USD — 1H Chart\n"
-                    f"📌 Setup: Break & Retest\n"
+                    f"📌 Setup: *Break & Retest*\n"
                     f"🔑 Level: ${signal['level']} ({level_label})\n\n"
                     f"💰 Entry: *${signal['entry']}*\n"
                     f"🎯 Take Profit: *${signal['tp']}*\n"
